@@ -154,7 +154,6 @@ class Employee(Base):
     def __repr__(self):
         return f"<Employee(id={self.id}, name='{self.full_name}', status='{self.status}')>"
     
-    
 class MessageLog(Base):
     """Модель для логирования всех сообщений диалога для истории."""
     __tablename__ = 'message_logs'
