@@ -1,0 +1,41 @@
+2025-11-07 10:59:32,370 - __main__ - INFO - Успешное подключение к пулу MySQL.
+2025-11-07 10:59:32,406 - googleapiclient.discovery_cache - INFO - file_cache is only supported with oauth2client<4.0.0
+2025-11-07 10:59:32,408 - googleapiclient.discovery_cache - INFO - file_cache is only supported with oauth2client<4.0.0
+2025-11-07 10:59:32,411 - __main__ - INFO - Успешное подключение к Google Docs и Drive API.
+2025-11-07 10:59:32,413 - __main__ - INFO - Успешное подключение к Redis по адресу 192.168.210.150:6379
+2025-11-07 10:59:32,500 - __main__ - INFO - Redis процессор запущен и слушает очереди...
+2025-11-07 10:59:32,500 - __main__ - INFO - Слушатель очереди 'main_task_queue' запущен.
+2025-11-07 10:59:32,520 - __main__ - INFO - Запись для сделки создана в CryptoDeals с deals_id: 9733
+2025-11-07 10:59:32,867 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8061042254:AAHBha3I8JcRMeZaAWrYGPWV_ReKfx9cCrc/createForumTopic "HTTP/1.1 200 OK"
+2025-11-07 10:59:32,867 - __main__ - INFO - ✅ Тема создана! ID: 5589
+2025-11-07 10:59:32,973 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8061042254:AAHBha3I8JcRMeZaAWrYGPWV_ReKfx9cCrc/sendMessage "HTTP/1.1 200 OK"
+2025-11-07 11:11:26,811 - __main__ - INFO - Запись для сделки создана в CryptoDeals с deals_id: 9734
+2025-11-07 11:11:27,113 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8061042254:AAHBha3I8JcRMeZaAWrYGPWV_ReKfx9cCrc/createForumTopic "HTTP/1.1 200 OK"
+2025-11-07 11:11:27,113 - __main__ - INFO - ✅ Тема создана! ID: 5591
+2025-11-07 11:11:27,243 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8061042254:AAHBha3I8JcRMeZaAWrYGPWV_ReKfx9cCrc/sendMessage "HTTP/1.1 200 OK"
+2025-11-07 13:06:01,423 - __main__ - INFO - Запись для сделки создана в CryptoDeals с deals_id: 9735
+2025-11-07 13:06:01,704 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8061042254:AAHBha3I8JcRMeZaAWrYGPWV_ReKfx9cCrc/createForumTopic "HTTP/1.1 200 OK"
+2025-11-07 13:06:01,708 - __main__ - INFO - ✅ Тема создана! ID: 5593
+2025-11-07 13:06:01,835 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8061042254:AAHBha3I8JcRMeZaAWrYGPWV_ReKfx9cCrc/sendMessage "HTTP/1.1 200 OK"
+2025-11-07 13:45:39,450 - __main__ - INFO - Запись для сделки создана в CryptoDeals с deals_id: 9736
+2025-11-07 13:45:39,822 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8061042254:AAHBha3I8JcRMeZaAWrYGPWV_ReKfx9cCrc/createForumTopic "HTTP/1.1 200 OK"
+2025-11-07 13:45:39,823 - __main__ - INFO - ✅ Тема создана! ID: 5595
+2025-11-07 13:45:39,943 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8061042254:AAHBha3I8JcRMeZaAWrYGPWV_ReKfx9cCrc/sendMessage "HTTP/1.1 200 OK"
+2025-11-07 13:45:46,374 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8061042254:AAHBha3I8JcRMeZaAWrYGPWV_ReKfx9cCrc/editMessageReplyMarkup "HTTP/1.1 200 OK"
+2025-11-07 13:45:46,477 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8061042254:AAHBha3I8JcRMeZaAWrYGPWV_ReKfx9cCrc/sendMessage "HTTP/1.1 200 OK"
+2025-11-07 13:45:46,479 - __main__ - INFO - Заявка 9736 в теме 5595 принята.
+2025-11-07 13:45:47,824 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8061042254:AAHBha3I8JcRMeZaAWrYGPWV_ReKfx9cCrc/sendMessage "HTTP/1.1 200 OK"
+2025-11-07 13:45:47,938 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8061042254:AAHBha3I8JcRMeZaAWrYGPWV_ReKfx9cCrc/editMessageReplyMarkup "HTTP/1.1 200 OK"
+2025-11-07 13:45:49,727 - __main__ - INFO - Статус 'awaiting_wallet_address' установлен для сделки 9736.
+2025-11-07 13:45:52,304 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8061042254:AAHBha3I8JcRMeZaAWrYGPWV_ReKfx9cCrc/editMessageReplyMarkup "HTTP/1.1 200 OK"
+2025-11-07 13:45:52,420 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8061042254:AAHBha3I8JcRMeZaAWrYGPWV_ReKfx9cCrc/sendMessage "HTTP/1.1 200 OK"
+2025-11-07 13:45:52,534 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8061042254:AAHBha3I8JcRMeZaAWrYGPWV_ReKfx9cCrc/closeForumTopic "HTTP/1.1 200 OK"
+2025-11-07 13:45:52,537 - __main__ - INFO - Тема 5595 (сделка 9736) закрыта.
+2025-11-07 15:48:23,977 - __main__ - INFO - Запись для сделки создана в CryptoDeals с deals_id: 9737
+2025-11-07 15:48:24,433 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8061042254:AAHBha3I8JcRMeZaAWrYGPWV_ReKfx9cCrc/createForumTopic "HTTP/1.1 200 OK"
+2025-11-07 15:48:24,434 - __main__ - INFO - ✅ Тема создана! ID: 5602
+2025-11-07 15:48:24,636 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8061042254:AAHBha3I8JcRMeZaAWrYGPWV_ReKfx9cCrc/sendMessage "HTTP/1.1 200 OK"
+2025-11-07 16:59:25,965 - __main__ - INFO - Запись для сделки создана в CryptoDeals с deals_id: 9738
+2025-11-07 16:59:26,276 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8061042254:AAHBha3I8JcRMeZaAWrYGPWV_ReKfx9cCrc/createForumTopic "HTTP/1.1 200 OK"
+2025-11-07 16:59:26,277 - __main__ - INFO - ✅ Тема создана! ID: 5604
+2025-11-07 16:59:26,390 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8061042254:AAHBha3I8JcRMeZaAWrYGPWV_ReKfx9cCrc/sendMessage "HTTP/1.1 200 OK"
