@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     technical_chat_id: int
     sla_timeout_minutes: int = 5
 
-    redis_host: str = '192.168.210.150'
+    redis_host: str = 'localhost'
     redis_port: int = 6379
     redis_db: int = 1
     redis_queue_name: str = 'main_task_queue'

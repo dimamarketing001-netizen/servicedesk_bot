@@ -139,6 +139,9 @@ class Employee(Base):
     ServiceDesk Bot не управляет этой таблицей, только читает из нее.
     """
     __tablename__ = 'employees'
+    __table_args__ = (
+        {'schema': 'time-tracker-bot', 'extend_existing': True}
+    )
     
     # Указываем только те поля, которые нам нужны для работы
     id = Column(Integer, primary_key=True)
@@ -148,9 +151,6 @@ class Employee(Base):
     status = Column(String(50)) # 'online', 'offline', etc.
     work_chat_id = Column(BigInteger, nullable=True)
     
-    # Говорим SQLAlchemy, что не нужно пытаться управлять этой таблицей (создавать/удалять)
-    __table_args__ = {'extend_existing': True}
-
     def __repr__(self):
         return f"<Employee(id={self.id}, name='{self.full_name}', status='{self.status}')>"
     

@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 # --- ВАШИ ДАННЫЕ (из .env) ---
 BOT_TOKEN='8229314742:AAHM35Yx6_t8C6qfIvALcckdO9hFqQOKpBw'
 MANAGER_CHAT_ID = -1003261949871
-DB_URL='mysql+aiomysql://mufer:vRZVgh6c@localhost:3306/Data_Science?charset=utf8mb4'
+DB_URL='mysql+aiomysql://dmitriy:yF9mO3rL7f@localhost:3306/servicedesk_bot?charset=utf8mb4'
 # -----------------------------
 
 logging.basicConfig(level=logging.INFO)
