@@ -43,29 +43,27 @@ async def add_or_update_kb_entry(session: AsyncSession, message_id: int, text: s
     await session.flush()
     print(f"✅ [DB] Saved Entry {message_id}: Keywords='{keywords_str}'")
 
-async def update_dialog_last_client_message_time(session: AsyncSession, dialog_id: int, timestamp: datetime):
-    dialog = await session.get(Dialog, dialog_id)
-    if dialog:
-        dialog.last_client_message_at = timestamp
-        # Если это ПЕРВОЕ сообщение после ответа менеджера (unanswered_since пустое)
-        if dialog.unanswered_since is None:
-            dialog.unanswered_since = timestamp
-            dialog.sla_alert_sent = False
-        await session.flush()
+# --- ФУНКЦИЯ ДЛЯ SYNC (которой сейчас не хватает) ---
+async def get_live_messages_for_sync(session: AsyncSession) -> list[MessageLog]:
+    """Выбирает сообщения для проверки на удаление (за последние 24 часа)"""
+    time_threshold = datetime.now() - timedelta(hours=24)
+    stmt = (
+        select(MessageLog)
+        .join(Dialog, MessageLog.dialog_id == Dialog.id)
+        .where(
+            MessageLog.is_deleted == False,
+            MessageLog.created_at >= time_threshold
+        )
+        .order_by(MessageLog.created_at.desc()) 
+        .limit(500)
+    )
+    result = await session.execute(stmt)
+    return result.scalars().all()
 
-async def reset_sla_status(session: AsyncSession, dialog_id: int):
-    """Вызывается, когда менеджер ответил: сбрасываем таймеры SLA"""
-    dialog = await session.get(Dialog, dialog_id)
-    if dialog:
-        dialog.unanswered_since = None
-        dialog.sla_alert_sent = False
-        await session.flush()
-
+# --- ФУНКЦИИ ДЛЯ SLA ---
 async def get_overdue_dialogs(session: AsyncSession, timeout_minutes: int):
-    """Ищет активные диалоги, где нет ответа более X минут"""
-    # Считаем порог времени
+    """Ищет активные диалоги, где ответ не дан вовремя"""
     threshold = datetime.now() - timedelta(minutes=timeout_minutes)
-    
     stmt = (
         select(Dialog)
         .where(
@@ -78,11 +76,22 @@ async def get_overdue_dialogs(session: AsyncSession, timeout_minutes: int):
     return result.scalars().all()
 
 async def reset_sla_status(session: AsyncSession, dialog_id: int):
-    """Сбрасывает SLA, когда менеджер ответил"""
+    """Сбрасывает таймеры SLA, когда менеджер ответил"""
     dialog = await session.get(Dialog, dialog_id)
     if dialog:
         dialog.unanswered_since = None
         dialog.sla_alert_sent = False
+        await session.flush()
+
+async def update_dialog_last_client_message_time(session: AsyncSession, dialog_id: int, timestamp: datetime):
+    """Обновляет время последнего сообщения клиента и запускает таймер SLA"""
+    dialog = await session.get(Dialog, dialog_id)
+    if dialog:
+        dialog.last_client_message_at = timestamp
+        # Если это ПЕРВОЕ сообщение в серии (таймер еще не запущен)
+        if dialog.unanswered_since is None:
+            dialog.unanswered_since = timestamp
+            dialog.sla_alert_sent = False
         await session.flush()
 
 # Обновите существующую функцию записи времени сообщения клиента:
@@ -282,12 +291,6 @@ async def update_dialog_status(session: AsyncSession, dialog_id: int, new_status
     dialog = await session.get(Dialog, dialog_id)
     if dialog:
         dialog.status = new_status
-        await session.flush()
-
-async def update_dialog_last_client_message_time(session: AsyncSession, dialog_id: int, timestamp: datetime):
-    dialog = await session.get(Dialog, dialog_id)
-    if dialog:
-        dialog.last_client_message_at = timestamp
         await session.flush()
 
 async def get_log_entry_by_client_msg_id(session: AsyncSession, client_msg_id: int) -> Optional[MessageLog]:
