@@ -122,19 +122,18 @@ async def sync_dialogs_job(session_pool: async_sessionmaker, bot: Bot, settings:
 
 async def check_sla_job(session_pool: async_sessionmaker, bot: Bot, settings: Settings):
     async with session_pool() as session:
-        # Получаем диалоги, просроченные на 5 минут (из конфига)
+        # Ищем просроченные диалоги
         overdue_dialogs = await db_commands.get_overdue_dialogs(session, settings.sla_timeout_minutes)
         
         for dialog in overdue_dialogs:
             try:
-                # Текст уведомления
                 alert_text = (
-                    f"⚠️ <b>SLA WARNING</b>\n"
-                    f"Клиент ждет ответа уже более {settings.sla_timeout_minutes} минут!\n"
-                    f"Первое сообщение было в: {dialog.unanswered_since.strftime('%H:%M:%S')}"
+                    f"⏰ <b>SLA WARNING!</b>\n"
+                    f"Клиент ждет ответа уже более {settings.sla_timeout_minutes} мин.\n"
+                    f"<i>Не забудьте ответить клиенту!</i>"
                 )
                 
-                # Отправляем в топик менеджеру
+                # Отправляем уведомление прямо в топик диалога
                 await bot.send_message(
                     chat_id=dialog.manager_chat_id,
                     message_thread_id=dialog.manager_topic_id,
@@ -142,11 +141,13 @@ async def check_sla_job(session_pool: async_sessionmaker, bot: Bot, settings: Se
                     parse_mode="HTML"
                 )
                 
-                # Помечаем в базе, что мы уже уведомили об этой задержке
+                # Помечаем, что уведомление отправлено (чтобы не спамить каждую минуту)
                 dialog.sla_alert_sent = True
+                await session.flush()
+                log.info(f"SLA alert sent for dialog {dialog.id}")
                 
             except Exception as e:
-                log.error(f"Failed to send SLA alert for dialog {dialog.id}: {e}")
+                log.error(f"Error sending SLA alert: {e}")
         
         await session.commit()
 

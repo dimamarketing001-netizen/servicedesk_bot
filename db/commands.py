@@ -62,7 +62,8 @@ async def reset_sla_status(session: AsyncSession, dialog_id: int):
         await session.flush()
 
 async def get_overdue_dialogs(session: AsyncSession, timeout_minutes: int):
-    """Ищет активные диалоги, где нет ответа более X минут и уведомление еще не слали"""
+    """Ищет активные диалоги, где нет ответа более X минут"""
+    # Считаем порог времени
     threshold = datetime.now() - timedelta(minutes=timeout_minutes)
     
     stmt = (
@@ -76,49 +77,24 @@ async def get_overdue_dialogs(session: AsyncSession, timeout_minutes: int):
     result = await session.execute(stmt)
     return result.scalars().all()
 
-async def search_knowledge_base(session: AsyncSession, query: str) -> list[KnowledgeBaseEntry]:
-    """
-    Поиск. Если ввели 'биток', ищем '%#биток%'. Если '#биток', ищем '%#биток%'.
-    """
-    clean_query = query.strip().lower()
-    
-    # Если пользователь не ввел #, добавляем его сами
-    if not clean_query.startswith("#"):
-        search_term = f"%#{clean_query}%"
-    else:
-        search_term = f"%{clean_query}%"
+async def reset_sla_status(session: AsyncSession, dialog_id: int):
+    """Сбрасывает SLA, когда менеджер ответил"""
+    dialog = await session.get(Dialog, dialog_id)
+    if dialog:
+        dialog.unanswered_since = None
+        dialog.sla_alert_sent = False
+        await session.flush()
 
-    print(f"🔍 [DB] Searching for LIKE '{search_term}'")
-
-    stmt = (
-        select(KnowledgeBaseEntry)
-        .where(KnowledgeBaseEntry.keywords.like(search_term))
-        .limit(5)
-    )
-    result = await session.execute(stmt)
-    found = result.scalars().all()
-    print(f"📊 [DB] Found {len(found)} results")
-    return found
-
-async def get_live_messages_for_sync(session: AsyncSession) -> list[MessageLog]:
-    """
-    Выбирает сообщения для проверки.
-    Берем ВСЕ активные сообщения за последние 24 часа.
-    """
-    time_threshold = datetime.now() - timedelta(hours=24)
-
-    stmt = (
-        select(MessageLog)
-        .join(Dialog, MessageLog.dialog_id == Dialog.id)
-        .where(
-            MessageLog.is_deleted == False,
-            MessageLog.created_at >= time_threshold
-        )
-        .order_by(MessageLog.created_at.desc()) 
-        .limit(500)
-    )
-    result = await session.execute(stmt)
-    return result.scalars().all()
+# Обновите существующую функцию записи времени сообщения клиента:
+async def update_dialog_last_client_message_time(session: AsyncSession, dialog_id: int, timestamp: datetime):
+    dialog = await session.get(Dialog, dialog_id)
+    if dialog:
+        dialog.last_client_message_at = timestamp
+        # ВАЖНО: Засекаем время только для ПЕРВОГО сообщения в серии
+        if dialog.unanswered_since is None:
+            dialog.unanswered_since = timestamp
+            dialog.sla_alert_sent = False
+        await session.flush()
 
 # --- Остальной код без изменений (оставляем старый) ---
 async def update_message_log_entry(session: AsyncSession, log_id: int, new_text: str):
