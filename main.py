@@ -404,7 +404,7 @@ async def handle_client_message(message: Message, session: AsyncSession, bot: Bo
             )
         except Exception as e:
             log.error(f"Could not pin message in topic {topic.message_thread_id}: {e}")
-            
+
     if dialog_id_to_update:
         await db_commands.update_dialog_last_client_message_time(session, dialog_id=dialog_id_to_update, timestamp=datetime.now())
     await session.commit()
@@ -606,6 +606,7 @@ async def handle_manager_reply_to_client(message: Message, session: AsyncSession
         client_telegram_message_id=sent_to_client_message.message_id, 
         manager_telegram_message_id=message.message_id                
     )
+    await db_commands.reset_sla_status(session, dialog.id)
 
     await session.commit()
 

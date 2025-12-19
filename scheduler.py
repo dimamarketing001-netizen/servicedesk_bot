@@ -121,8 +121,34 @@ async def sync_dialogs_job(session_pool: async_sessionmaker, bot: Bot, settings:
         await session.commit()
 
 async def check_sla_job(session_pool: async_sessionmaker, bot: Bot, settings: Settings):
-    # (Ваш код SLA)
-    pass
+    async with session_pool() as session:
+        # Получаем диалоги, просроченные на 5 минут (из конфига)
+        overdue_dialogs = await db_commands.get_overdue_dialogs(session, settings.sla_timeout_minutes)
+        
+        for dialog in overdue_dialogs:
+            try:
+                # Текст уведомления
+                alert_text = (
+                    f"⚠️ <b>SLA WARNING</b>\n"
+                    f"Клиент ждет ответа уже более {settings.sla_timeout_minutes} минут!\n"
+                    f"Первое сообщение было в: {dialog.unanswered_since.strftime('%H:%M:%S')}"
+                )
+                
+                # Отправляем в топик менеджеру
+                await bot.send_message(
+                    chat_id=dialog.manager_chat_id,
+                    message_thread_id=dialog.manager_topic_id,
+                    text=alert_text,
+                    parse_mode="HTML"
+                )
+                
+                # Помечаем в базе, что мы уже уведомили об этой задержке
+                dialog.sla_alert_sent = True
+                
+            except Exception as e:
+                log.error(f"Failed to send SLA alert for dialog {dialog.id}: {e}")
+        
+        await session.commit()
 
 def setup_scheduler(session_pool: async_sessionmaker, bot: Bot, settings: Settings) -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone="Europe/Moscow")

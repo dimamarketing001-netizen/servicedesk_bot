@@ -43,6 +43,39 @@ async def add_or_update_kb_entry(session: AsyncSession, message_id: int, text: s
     await session.flush()
     print(f"✅ [DB] Saved Entry {message_id}: Keywords='{keywords_str}'")
 
+async def update_dialog_last_client_message_time(session: AsyncSession, dialog_id: int, timestamp: datetime):
+    dialog = await session.get(Dialog, dialog_id)
+    if dialog:
+        dialog.last_client_message_at = timestamp
+        # Если это ПЕРВОЕ сообщение после ответа менеджера (unanswered_since пустое)
+        if dialog.unanswered_since is None:
+            dialog.unanswered_since = timestamp
+            dialog.sla_alert_sent = False
+        await session.flush()
+
+async def reset_sla_status(session: AsyncSession, dialog_id: int):
+    """Вызывается, когда менеджер ответил: сбрасываем таймеры SLA"""
+    dialog = await session.get(Dialog, dialog_id)
+    if dialog:
+        dialog.unanswered_since = None
+        dialog.sla_alert_sent = False
+        await session.flush()
+
+async def get_overdue_dialogs(session: AsyncSession, timeout_minutes: int):
+    """Ищет активные диалоги, где нет ответа более X минут и уведомление еще не слали"""
+    threshold = datetime.now() - timedelta(minutes=timeout_minutes)
+    
+    stmt = (
+        select(Dialog)
+        .where(
+            Dialog.status == 'active',
+            Dialog.unanswered_since <= threshold,
+            Dialog.sla_alert_sent == False
+        )
+    )
+    result = await session.execute(stmt)
+    return result.scalars().all()
+
 async def search_knowledge_base(session: AsyncSession, query: str) -> list[KnowledgeBaseEntry]:
     """
     Поиск. Если ввели 'биток', ищем '%#биток%'. Если '#биток', ищем '%#биток%'.

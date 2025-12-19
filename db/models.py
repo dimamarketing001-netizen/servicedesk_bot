@@ -73,6 +73,9 @@ class Dialog(Base):
     created_at = Column(DateTime, default=func.now())
     last_client_message_at = Column(DateTime, nullable=True)
 
+    unanswered_since = Column(DateTime, nullable=True) 
+    sla_alert_sent = Column(Boolean, default=False)
+
     # Отношения
     client = relationship("User", foreign_keys=[client_id])
     manager = relationship("User", foreign_keys=[manager_id])
