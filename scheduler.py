@@ -154,14 +154,25 @@ async def check_sla_job(session_pool: async_sessionmaker, bot: Bot, settings):
         for dialog in dialogs:
             # Считаем, сколько клиент ждет (в минутах)
             wait_time = (now - dialog.unanswered_since).total_seconds() / 60
+
+            if dialog.manager:
+                name = dialog.manager.full_name or "Без имени"
+                # Если в базе всё еще вопросики, а юзернейма нет, выведем хотя бы ID
+                if "?" in name and not dialog.manager.username:
+                    manager_info = f"Менеджер ID:{dialog.manager.id}"
+                elif dialog.manager.username:
+                    manager_info = f"@{dialog.manager.username}"
+                else:
+                    manager_info = name
+            else:
+                manager_info = "Не назначен"
             
             # --- СЦЕНАРИЙ 1: ПЕРВОЕ НАРУШЕНИЕ (5 мин по умолчанию) ---
             if wait_time >= settings.sla_timeout_minutes and not dialog.sla_alert_sent:
-                alert_text = (
-                    f"⏰ <b>SLA WARNING (Первичное)</b>\n"
+                alert_text = (  
+                    f"⏰ <b>SLA WARNING</b>\n"
                     f"Диалог: #{dialog.id}\n"
-                    f"Клиент: {dialog.client.full_name}\n"
-                    f"Менеджер: @{dialog.manager.username if dialog.manager else 'Не назначен'}\n"
+                    f"Менеджер: {manager_info}\n"
                     f"⚠️ Ожидание: <b>{int(wait_time)} мин.</b>"
                 )
                 await send_sla_alerts(bot, dialog, alert_text, settings.escalation_channel_id)

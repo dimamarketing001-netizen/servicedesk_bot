@@ -103,7 +103,7 @@ class SLAViolation(Base):
     id = Column(Integer, primary_key=True)
     dialog_id = Column(Integer, ForeignKey('dialogs.id'), nullable=False)
     manager_id = Column(Integer, ForeignKey('users.id'), nullable=True)
-    violation_type = Column(String(50)) # 'initial', 'repeated'
+    violation_type = Column(String(50)) 
     minutes_delayed = Column(Integer)
     created_at = Column(DateTime, default=func.now())
 
