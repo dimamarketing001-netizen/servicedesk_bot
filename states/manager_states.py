@@ -22,6 +22,7 @@ class ManagerFSM(StatesGroup):
     app_editing_field = State()  
     app_selecting_brand = State()
     app_confirming_percent_change = State() 
+    app_selecting_city = State()
 
     # Состояние для добавления заметки
     adding_note = State()

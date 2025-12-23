@@ -47,6 +47,13 @@ redis_client = redis.Redis(
 
 BRANDS = ["KeineExchange", "ftCash", "BitRocket", "AvanChange", "CoinsBlack", "DocrtorBit", "FOEX", "DIMMAR", "SberBit", "ArkedUSDT", "MULTIKASSA", "Fox", "ZombieCash", "AWX"]
 CURRENCIES = ["Tether (TRC-20)", "Tether (ERC-20)", "Tether (BEP20)", "Bitcoin", "Litecoin", "Ethereum (ERC-20)", "Tron (TRX)", "USD Coin (ERC-20)", "USD Coin (TRC-20)", "Рубль (RUB)"]
+CITIES = [
+    "г. Екатеринбург", "г. Иваново", "г. Казань", "г. Кострома", 
+    "г. Москва", "г. Нижний Новгород", "г. Нижний Тагил", "г. Новосибирск", 
+    "г. Омск", "г. Пермь", "г. Самара", "г. Санкт-Петербург", 
+    "г. Тверь", "г. Тольятти", "г. Тула", "г. Тюмень", 
+    "г. Челябинск", "г. Ярославль", "г. Сургут", "г. Уфа", "г. Сочи"
+]
 
 async def ask_for_datetime(message: Message, state: FSMContext, error: bool = False):
     prompt = "Введите дату и время встречи (пример: `19.09.2025 15:00`) или выберите быстрый вариант:"
@@ -105,6 +112,7 @@ def build_keyboard_for_app(items: list, items_per_row: int = 2) -> InlineKeyboar
 def format_application_summary(data: dict) -> str:
     """Форматирует собранные данные по заявке в итоговое сообщение."""
     summary = "<b>✅ Новая заявка</b>\n\n"
+    summary += f"<b>Город:</b> {data.get('city', 'Не указан')}\n"
     summary += f"<b>Тип:</b> {data.get('type', 'Не указан')}\n"
     summary += f"<b>Направление:</b> {data.get('direction', 'Не указано')}\n"
     summary += f"<b>Бренд:</b> {data.get('brand', 'Не указан')}\n"
@@ -133,6 +141,7 @@ def format_summary_for_client(data: dict) -> str:
     Форматирует данные по заявке в краткое сообщение для клиента.
     """
     summary = "<b>Детали вашей встречи:</b>\n\n"
+    summary += f"<b>Город:</b> {data.get('city', 'Не указан')}\n"
     
     # Собираем ФИО
     full_name = f"{data.get('last_name', '')} {data.get('first_name', '')} {data.get('patronymic', '')}".strip()
@@ -1065,6 +1074,7 @@ async def app_pause_handler(query: CallbackQuery, state: FSMContext, bot: Bot):
     
     await query.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     await query.answer("На паузе")
+
 @dp.callback_query(F.data == "app_resume")
 async def app_resume_handler(query: CallbackQuery, state: FSMContext, bot: Bot):
     """Возобновляет заявку и восстанавливает клавиатуру."""
@@ -1085,6 +1095,10 @@ async def app_resume_handler(query: CallbackQuery, state: FSMContext, bot: Bot):
     
     if saved_state_str == ManagerFSM.app_selecting_direction.state:
         kb = get_app_step_keyboard({"Обратная": "Обратная", "Прямая": "Прямая"})
+    
+    elif saved_state_str == ManagerFSM.app_selecting_city.state:
+        city_btns = {city: city for city in CITIES}
+        kb = get_app_step_keyboard(city_btns)
         
     elif saved_state_str == ManagerFSM.app_selecting_action.state:
         kb = get_app_step_keyboard({"Принять": "Принять", "Выдать": "Выдать"})
@@ -1379,15 +1393,35 @@ async def app_enter_datetime(message: Message, state: FSMContext):
         await display_confirmation_screen(message, state)
         return
 
-    prompt = "Шаг 6: Что нужно сделать?"
+    prompt = "Шаг 6: Выберите город:"
+    await state.update_data(last_prompt=prompt)
+    
+    city_btns = {city: city for city in CITIES}
+    kb = get_app_step_keyboard(city_btns) # Используем вашу функцию, она сделает по 2 кнопки в ряд
+    
+    await edit_or_send_message(message, state, text=prompt, reply_markup=kb)
+    await state.set_state(ManagerFSM.app_selecting_city)
+
+@dp.callback_query(StateFilter(ManagerFSM.app_selecting_city))
+async def app_select_city(query: CallbackQuery, state: FSMContext):
+    await query.answer()
+    await state.update_data(city=query.data)
+    
+    data = await state.get_data()
+    if data.get('editing_mode'):
+        await state.update_data(editing_mode=False)
+        await display_confirmation_screen(query.message, state, edit_mode=True)
+        return
+
+    prompt = "Шаг 7: Что нужно сделать?"
     await state.update_data(last_prompt=prompt)
     
     btns = {"Принять": "Принять", "Выдать": "Выдать"}
     kb = get_app_step_keyboard(btns)
     
-    await edit_or_send_message(message, state, text=prompt, reply_markup=kb)
+    await query.message.edit_text(text=prompt, reply_markup=kb, parse_mode="HTML")
     await state.set_state(ManagerFSM.app_selecting_action)
-        
+
 # --- 7. Выбор действия (Принять/Выдать) ---
 @dp.callback_query(StateFilter(ManagerFSM.app_selecting_action))
 async def app_select_action(query: CallbackQuery, state: FSMContext):
@@ -1723,6 +1757,7 @@ async def app_confirmation_handler(query: CallbackQuery, state: FSMContext, bot:
         builder = InlineKeyboardBuilder()
         fields = {
             "edit_direction": "Направление",
+            "edit_city": "📍 Город",
             "edit_last_name": "Фамилия",
             "edit_first_name": "Имя",
             "edit_patronymic": "Отчество",
@@ -1802,6 +1837,11 @@ async def app_select_field_to_edit(query: CallbackQuery, state: FSMContext):
             ManagerFSM.app_selecting_brand, 
             "Выберите новый бренд:", 
             get_app_step_keyboard(brand_btns)
+        ),
+        "edit_city": (
+            ManagerFSM.app_selecting_city, 
+            "Выберите новый город:", 
+            get_app_step_keyboard({c: c for c in CITIES})
         ),
         "edit_direction": (
             ManagerFSM.app_selecting_direction, 
