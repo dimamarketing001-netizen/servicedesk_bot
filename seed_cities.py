@@ -1,10 +1,12 @@
 import asyncio
+import sys
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy import delete
 from config import settings
-from db.models import City, Base
+from db.models import City
 
 async def seed_cities():
-    # Создаем движок (обязательно с charset=utf8mb4)
+    # Создаем движок
     engine = create_async_engine(settings.db_url)
     session_pool = async_sessionmaker(engine, expire_on_commit=False)
 
@@ -22,18 +24,22 @@ async def seed_cities():
         ('г. Сочи', -5060292520)
     ]
 
-    async with session_pool() as session:
-        # Очищаем таблицу перед вставкой
-        from sqlalchemy import delete
-        await session.execute(delete(City))
-        
-        # Добавляем города
-        for name, chat_id in cities_data:
-            city = City(name=name, telegram_chat_id=chat_id)
-            session.add(city)
-        
-        await session.commit()
-        print("✅ Города успешно загружены в БД без иероглифов!")
+    try:
+        async with session_pool() as session:
+            # Очищаем таблицу
+            await session.execute(delete(City))
+            
+            # Добавляем города
+            for name, chat_id in cities_data:
+                city = City(name=name, telegram_chat_id=chat_id)
+                session.add(city)
+            
+            await session.commit()
+            print("DONE: Data saved to database successfully.") # Только английский для терминала
+    except Exception as e:
+        print(f"ERROR: {e}")
+    finally:
+        await engine.dispose() # Закрываем соединение правильно
 
 if __name__ == "__main__":
     asyncio.run(seed_cities())
