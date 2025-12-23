@@ -81,6 +81,7 @@ class Dialog(Base):
     manager = relationship("User", foreign_keys=[manager_id])
     messages = relationship("Message", back_populates="dialog", cascade="all, delete-orphan")
     notes = relationship("Note", back_populates="dialog", cascade="all, delete-orphan")
+    sla_last_alert_at = Column(DateTime, nullable=True)
 
     def __repr__(self):
         return f"<Dialog(id={self.id}, client_id={self.client_id}, status='{self.status}')>"
@@ -97,7 +98,14 @@ class City(Base):
     def __repr__(self):
         return f"<City(id={self.id}, name='{self.name}')>"
 
-  
+class SLAViolation(Base):
+    __tablename__ = 'sla_violations'
+    id = Column(Integer, primary_key=True)
+    dialog_id = Column(Integer, ForeignKey('dialogs.id'), nullable=False)
+    manager_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    violation_type = Column(String(50)) # 'initial', 'repeated'
+    minutes_delayed = Column(Integer)
+    created_at = Column(DateTime, default=func.now())
 
 class Message(Base):
     """Модель сообщения в рамках диалога."""

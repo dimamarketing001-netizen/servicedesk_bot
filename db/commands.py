@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from aiogram.types import User as AiogramUser
 from sqlalchemy import select, func, and_, or_, case
-from db.models import User, Dialog, Note, Employee, MessageLog, KnowledgeBaseEntry, City
+from db.models import User, Dialog, Note, Employee, MessageLog, KnowledgeBaseEntry, City, SLAViolation
 import re
 
 async def add_or_update_kb_entry(session: AsyncSession, message_id: int, text: str):
@@ -81,7 +81,28 @@ async def reset_sla_status(session: AsyncSession, dialog_id: int):
     if dialog:
         dialog.unanswered_since = None
         dialog.sla_alert_sent = False
+        dialog.sla_last_alert_at = None # Сбрасываем время уведомления
         await session.flush()
+
+async def log_sla_violation(session: AsyncSession, dialog_id: int, manager_id: int, v_type: str, delay: int):
+    """Записывает факт нарушения в историю."""
+    violation = SLAViolation(
+        dialog_id=dialog_id,
+        manager_id=manager_id,
+        violation_type=v_type,
+        minutes_delayed=delay
+    )
+    session.add(violation)
+    await session.flush()
+
+async def get_all_overdue_dialogs(session: AsyncSession):
+    """Получает все активные диалоги, где клиент ждет ответа."""
+    stmt = select(Dialog).where(
+        Dialog.status == 'active',
+        Dialog.unanswered_since.isnot(None)
+    ).options(joinedload(Dialog.manager), joinedload(Dialog.client))
+    result = await session.execute(stmt)
+    return result.scalars().all()
 
 async def update_dialog_last_client_message_time(session: AsyncSession, dialog_id: int, timestamp: datetime):
     """Обновляет время последнего сообщения клиента и запускает таймер SLA"""

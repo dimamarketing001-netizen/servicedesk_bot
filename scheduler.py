@@ -120,35 +120,81 @@ async def sync_dialogs_job(session_pool: async_sessionmaker, bot: Bot, settings:
 
         await session.commit()
 
-async def check_sla_job(session_pool: async_sessionmaker, bot: Bot, settings: Settings):
+async def send_sla_alerts(bot: Bot, dialog, text: str, escalation_chat_id: int):
+    """Отправляет уведомление и в топик, и в канал эскалации."""
+    # 1. В топик менеджера
+    try:
+        await bot.send_message(
+            chat_id=dialog.manager_chat_id,
+            message_thread_id=dialog.manager_topic_id,
+            text=text,
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        log.error(f"SLA Topic Alert Error: {e}")
+
+    # 2. В канал эскалации (руководству)
+    try:
+        # Добавим ссылку на топик для руководства
+        chat_id_clean = str(dialog.manager_chat_id).replace("-100", "")
+        link = f"\n\n🔗 <a href='https://t.me/c/{chat_id_clean}/{dialog.manager_topic_id}'>Перейти к диалогу</a>"
+        await bot.send_message(
+            chat_id=escalation_chat_id,
+            text=text + link,
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        log.error(f"SLA Escalation Group Alert Error: {e}")
+
+async def check_sla_job(session_pool: async_sessionmaker, bot: Bot, settings):
     async with session_pool() as session:
-        # Ищем просроченные диалоги
-        overdue_dialogs = await db_commands.get_overdue_dialogs(session, settings.sla_timeout_minutes)
-        
-        for dialog in overdue_dialogs:
-            try:
+        now = datetime.now()
+        dialogs = await db_commands.get_all_overdue_dialogs(session)
+
+        for dialog in dialogs:
+            # Считаем, сколько клиент ждет (в минутах)
+            wait_time = (now - dialog.unanswered_since).total_seconds() / 60
+            
+            # --- СЦЕНАРИЙ 1: ПЕРВОЕ НАРУШЕНИЕ (5 мин по умолчанию) ---
+            if wait_time >= settings.sla_timeout_minutes and not dialog.sla_alert_sent:
                 alert_text = (
-                    f"⏰ <b>SLA WARNING!</b>\n"
-                    f"Клиент ждет ответа уже более {settings.sla_timeout_minutes} мин.\n"
-                    f"<i>Не забудьте ответить клиенту!</i>"
+                    f"⏰ <b>SLA WARNING (Первичное)</b>\n"
+                    f"Диалог: #{dialog.id}\n"
+                    f"Клиент: {dialog.client.full_name}\n"
+                    f"Менеджер: @{dialog.manager.username if dialog.manager else 'Не назначен'}\n"
+                    f"⚠️ Ожидание: <b>{int(wait_time)} мин.</b>"
                 )
+                await send_sla_alerts(bot, dialog, alert_text, settings.escalation_channel_id)
                 
-                # Отправляем уведомление прямо в топик диалога
-                await bot.send_message(
-                    chat_id=dialog.manager_chat_id,
-                    message_thread_id=dialog.manager_topic_id,
-                    text=alert_text,
-                    parse_mode="HTML"
-                )
-                
-                # Помечаем, что уведомление отправлено (чтобы не спамить каждую минуту)
+                # Обновляем статус в БД
                 dialog.sla_alert_sent = True
-                await session.flush()
-                log.info(f"SLA alert sent for dialog {dialog.id}")
+                dialog.sla_last_alert_at = now
                 
-            except Exception as e:
-                log.error(f"Error sending SLA alert: {e}")
-        
+                await db_commands.log_sla_violation(
+                    session, dialog.id, dialog.manager_id, 'initial', int(wait_time)
+                )
+
+            # --- СЦЕНАРИЙ 2: ПОВТОРНОЕ НАРУШЕНИЕ (Через 3 мин после первого и далее каждую минуту) ---
+            elif dialog.sla_alert_sent:
+                # Сколько прошло с момента последнего уведомления
+                time_since_last_alert = (now - dialog.sla_last_alert_at).total_seconds() / 60
+                
+                # Если прошло более 3-х минут с ПЕРВОГО аларма, начинаем долбить каждую минуту
+                if wait_time >= (settings.sla_timeout_minutes + 3) and time_since_last_alert >= 1:
+                    alert_text = (
+                        f"🚨 <b>SLA ESCALATION (Критическое)</b>\n"
+                        f"Диалог: #{dialog.id}\n"
+                        f"Менеджер игнорирует ответ!\n"
+                        f"🔥 Суммарное ожидание: <b>{int(wait_time)} мин.</b>"
+                    )
+                    await send_sla_alerts(bot, dialog, alert_text, settings.escalation_channel_id)
+                    
+                    dialog.sla_last_alert_at = now # Обновляем время, чтобы сработать через минуту
+                    
+                    await db_commands.log_sla_violation(
+                        session, dialog.id, dialog.manager_id, 'repeated', int(wait_time)
+                    )
+
         await session.commit()
 
 def setup_scheduler(session_pool: async_sessionmaker, bot: Bot, settings: Settings) -> AsyncIOScheduler:
