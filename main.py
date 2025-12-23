@@ -47,13 +47,6 @@ redis_client = redis.Redis(
 
 BRANDS = ["KeineExchange", "ftCash", "BitRocket", "AvanChange", "CoinsBlack", "DocrtorBit", "FOEX", "DIMMAR", "SberBit", "ArkedUSDT", "MULTIKASSA", "Fox", "ZombieCash", "AWX"]
 CURRENCIES = ["Tether (TRC-20)", "Tether (ERC-20)", "Tether (BEP20)", "Bitcoin", "Litecoin", "Ethereum (ERC-20)", "Tron (TRX)", "USD Coin (ERC-20)", "USD Coin (TRC-20)", "Рубль (RUB)"]
-CITIES = [
-    "г. Екатеринбург", "г. Иваново", "г. Казань", "г. Кострома", 
-    "г. Москва", "г. Нижний Новгород", "г. Нижний Тагил", "г. Новосибирск", 
-    "г. Омск", "г. Пермь", "г. Самара", "г. Санкт-Петербург", 
-    "г. Тверь", "г. Тольятти", "г. Тула", "г. Тюмень", 
-    "г. Челябинск", "г. Ярославль", "г. Сургут", "г. Уфа", "г. Сочи"
-]
 
 async def ask_for_datetime(message: Message, state: FSMContext, error: bool = False):
     prompt = "Введите дату и время встречи (пример: `19.09.2025 15:00`) или выберите быстрый вариант:"
@@ -112,7 +105,7 @@ def build_keyboard_for_app(items: list, items_per_row: int = 2) -> InlineKeyboar
 def format_application_summary(data: dict) -> str:
     """Форматирует собранные данные по заявке в итоговое сообщение."""
     summary = "<b>✅ Новая заявка</b>\n\n"
-    summary += f"<b>Город:</b> {data.get('city', 'Не указан')}\n"
+    summary += f"<b>Город:</b> {data.get('city_name', 'Не указан')}\n"
     summary += f"<b>Тип:</b> {data.get('type', 'Не указан')}\n"
     summary += f"<b>Направление:</b> {data.get('direction', 'Не указано')}\n"
     summary += f"<b>Бренд:</b> {data.get('brand', 'Не указан')}\n"
@@ -141,7 +134,7 @@ def format_summary_for_client(data: dict) -> str:
     Форматирует данные по заявке в краткое сообщение для клиента.
     """
     summary = "<b>Детали вашей встречи:</b>\n\n"
-    summary += f"<b>Город:</b> {data.get('city', 'Не указан')}\n"
+    summary += f"<b>Город:</b> {data.get('city_name', 'Не указан')}\n"
     
     # Собираем ФИО
     full_name = f"{data.get('last_name', '')} {data.get('first_name', '')} {data.get('patronymic', '')}".strip()
@@ -1076,7 +1069,7 @@ async def app_pause_handler(query: CallbackQuery, state: FSMContext, bot: Bot):
     await query.answer("На паузе")
 
 @dp.callback_query(F.data == "app_resume")
-async def app_resume_handler(query: CallbackQuery, state: FSMContext, bot: Bot):
+async def app_resume_handler(query: CallbackQuery, state: FSMContext, bot: Bot, session: AsyncSession): 
     """Возобновляет заявку и восстанавливает клавиатуру."""
     data = await state.get_data()
     saved_state_str = data.get('saved_state')
@@ -1097,7 +1090,8 @@ async def app_resume_handler(query: CallbackQuery, state: FSMContext, bot: Bot):
         kb = get_app_step_keyboard({"Обратная": "Обратная", "Прямая": "Прямая"})
     
     elif saved_state_str == ManagerFSM.app_selecting_city.state:
-        city_btns = {city: city for city in CITIES}
+        cities = await db_commands.get_all_cities(session)
+        city_btns = {city.name: f"city_id:{city.id}" for city in cities}
         kb = get_app_step_keyboard(city_btns)
         
     elif saved_state_str == ManagerFSM.app_selecting_action.state:
@@ -1374,7 +1368,7 @@ async def suggest_date_from_button(query: CallbackQuery, state: FSMContext):
 
 # --- 6. Ввод Даты ---
 @dp.message(StateFilter(ManagerFSM.app_entering_datetime))
-async def app_enter_datetime(message: Message, state: FSMContext):
+async def app_enter_datetime(message: Message, state: FSMContext, session: AsyncSession):
     try:
         datetime.strptime(message.text, '%d.%m.%Y %H:%M')
     except ValueError:
@@ -1386,26 +1380,38 @@ async def app_enter_datetime(message: Message, state: FSMContext):
     await state.update_data(datetime=message.text)
     try: await message.delete()
     except: pass
-    
+
     data = await state.get_data()
     if data.get('editing_mode'):
         await state.update_data(editing_mode=False)
         await display_confirmation_screen(message, state)
         return
 
+    # Загружаем города из БД
+    cities = await db_commands.get_all_cities(session)
+    
     prompt = "Шаг 6: Выберите город:"
     await state.update_data(last_prompt=prompt)
     
-    city_btns = {city: city for city in CITIES}
-    kb = get_app_step_keyboard(city_btns) # Используем вашу функцию, она сделает по 2 кнопки в ряд
+    # В callback_data кладем ID города
+    city_btns = {city.name: f"city_id:{city.id}" for city in cities}
+    kb = get_app_step_keyboard(city_btns)
     
     await edit_or_send_message(message, state, text=prompt, reply_markup=kb)
     await state.set_state(ManagerFSM.app_selecting_city)
 
-@dp.callback_query(StateFilter(ManagerFSM.app_selecting_city))
-async def app_select_city(query: CallbackQuery, state: FSMContext):
+@dp.callback_query(StateFilter(ManagerFSM.app_selecting_city), F.data.startswith("city_id:"))
+async def app_select_city(query: CallbackQuery, state: FSMContext, session: AsyncSession):
+    city_id = int(query.data.split(":")[1])
+    city = await db_commands.get_city_by_id(session, city_id)
+    
+    if not city:
+        await query.answer("Ошибка: город не найден.")
+        return
+
     await query.answer()
-    await state.update_data(city=query.data)
+    # Сохраняем ID для робота и Name для текста
+    await state.update_data(city_id=city.id, city_name=city.name)
     
     data = await state.get_data()
     if data.get('editing_mode'):
@@ -1415,9 +1421,7 @@ async def app_select_city(query: CallbackQuery, state: FSMContext):
 
     prompt = "Шаг 7: Что нужно сделать?"
     await state.update_data(last_prompt=prompt)
-    
-    btns = {"Принять": "Принять", "Выдать": "Выдать"}
-    kb = get_app_step_keyboard(btns)
+    kb = get_app_step_keyboard({"Принять": "Принять", "Выдать": "Выдать"})
     
     await query.message.edit_text(text=prompt, reply_markup=kb, parse_mode="HTML")
     await state.set_state(ManagerFSM.app_selecting_action)
@@ -1778,7 +1782,7 @@ async def app_confirmation_handler(query: CallbackQuery, state: FSMContext, bot:
 
 # --- Обработчик для выбора поля для редактирования ---
 @dp.callback_query(StateFilter(ManagerFSM.app_editing_field))
-async def app_select_field_to_edit(query: CallbackQuery, state: FSMContext):
+async def app_select_field_to_edit(query: CallbackQuery, state: FSMContext, session: AsyncSession):
     await query.answer()
     
     if query.data == "back_to_confirmation":
@@ -1830,18 +1834,24 @@ async def app_select_field_to_edit(query: CallbackQuery, state: FSMContext):
         await query.message.edit_text(prompt, reply_markup=get_app_step_keyboard(), parse_mode="HTML")
         await state.set_state(target_state)
         return
+    
+        
+    if query.data == "edit_city":
+        cities = await db_commands.get_all_cities(session) # Теперь сессия есть!
+        prompt = "Выберите новый город:"
+        kb = get_app_step_keyboard({city.name: f"city_id:{city.id}" for city in cities})
+        await state.update_data(editing_mode=True, last_prompt=prompt)
+        await query.message.edit_text(prompt, reply_markup=kb, parse_mode="HTML")
+        await state.set_state(ManagerFSM.app_selecting_city)
+        return
 
+  
     # --- КАРТА ДЛЯ ПРОСТЫХ ПОЛЕЙ ---
     field_map = {
         "edit_brand": (
             ManagerFSM.app_selecting_brand, 
             "Выберите новый бренд:", 
             get_app_step_keyboard(brand_btns)
-        ),
-        "edit_city": (
-            ManagerFSM.app_selecting_city, 
-            "Выберите новый город:", 
-            get_app_step_keyboard({c: c for c in CITIES})
         ),
         "edit_direction": (
             ManagerFSM.app_selecting_direction, 

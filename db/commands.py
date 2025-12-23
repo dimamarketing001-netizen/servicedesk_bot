@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from aiogram.types import User as AiogramUser
 from sqlalchemy import select, func, and_, or_, case
-from db.models import User, Dialog, Note, Employee, MessageLog, KnowledgeBaseEntry
+from db.models import User, Dialog, Note, Employee, MessageLog, KnowledgeBaseEntry, City
 import re
 
 async def add_or_update_kb_entry(session: AsyncSession, message_id: int, text: str):
@@ -352,3 +352,13 @@ async def get_all_notes_for_client(session: AsyncSession, dialog_id: int) -> lis
     )
     result = await session.execute(stmt)
     return result.scalars().all()
+
+async def get_all_cities(session: AsyncSession) -> list[City]:
+    """Возвращает список всех городов для клавиатуры."""
+    stmt = select(City).order_by(City.name.asc())
+    result = await session.execute(stmt)
+    return result.scalars().all()
+
+async def get_city_by_id(session: AsyncSession, city_id: int) -> Optional[City]:
+    """Получает город по ID."""
+    return await session.get(City, city_id)

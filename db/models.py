@@ -85,6 +85,19 @@ class Dialog(Base):
     def __repr__(self):
         return f"<Dialog(id={self.id}, client_id={self.client_id}, status='{self.status}')>"
 
+    
+class City(Base):
+    """Модель городов для распределения заявок."""
+    __tablename__ = 'cities'
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False)
+    telegram_chat_id = Column(BigInteger, nullable=False)
+
+    def __repr__(self):
+        return f"<City(id={self.id}, name='{self.name}')>"
+
+  
 
 class Message(Base):
     """Модель сообщения в рамках диалога."""
